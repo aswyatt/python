@@ -5,7 +5,7 @@ class Point:
         self.x = x
         self.y = y
 
-    def distance(self, points: Point) -> float:
+    def distance(self, points) -> float:
         dx = self.x - points.x
         dy = self.y - points.y
         dist = np.sqrt((dx**2) + (dy**2))
