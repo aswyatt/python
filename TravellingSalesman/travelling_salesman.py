@@ -10,14 +10,14 @@ class Point2D:
 
     Defines a point (x,y) in 2D space and calculates the distance between this point and a set of points
     """
-    def __init__(self, x, y) -> None:
+    def __init__(self, x:float, y:float) -> None:
         self.x = x
         self.y = y
 
-    def distance(self, points) -> float:
-        dx = self.x - points.x
-        dy = self.y - points.y
-        dist = np.sqrt((dx**2) + (dy**2))
+    def distance(self, point) -> float:
+        dx = self.x - point.x
+        dy = self.y - point.y
+        dist = math.sqrt((dx**2) + (dy**2))
         return dist
 
     def __repr__(self) -> str:
@@ -72,11 +72,12 @@ class Route:
         return 1/self.distance
 
     def swap_direction(self, index1: int, index2: int=None) -> float:
-        N = len(self.route)
+        route = self.route
+        N = len(route)
         if index2 is None:
             index2 = (index1+1) % N
         old_dist = self._calc_distance(index1) + self._calc_distance(index2)
-        self.route[index1], self.route[index2] = self.route[index2], self.route[index1]  # Swap adjacent points on route
+        route[index1], route[index2] = route[index2], route[index1]  # Swap adjacent points on route
         new_dist = self._calc_distance(index1) + self._calc_distance(index2)
         delta = new_dist - old_dist
         self.distance += delta
@@ -94,6 +95,46 @@ class Route:
         return plt.plot(x, y, "o-")
 
 
+class SimAnneal:
+    """ Simulated annealing class for TSP
+    """
+    def __init__(self, route:Route, T0:float=1, dT:float=.1) -> None:
+        self.route = route
+        self.T = T0
+        self.dT = dT
+        self.Iter = 0
+
+
+    def attempt_swap(self) -> Tuple[float, float]:
+        """ Attempt to swap two random points
+
+        Greedy swap if better, otherwise with probability P = exp(-dE/T) where dE = N*dist_incr/total_distance
+        """
+        route = self.route
+        N = len(route.route)
+        indx = random.sample(range(N), k=2)
+        dist = route.distance
+        fitness = route.fitness
+        dE = N*route.swap_direction(indx[0], indx[1])/dist
+        val = math.exp(-2*dE/self.T)
+        if val<=random.random():
+            #   Return to original value
+            route.route[indx[0]], route.route[indx[1]] = route.route[indx[1]], route.route[indx[0]]
+            route.distance = dist
+            route.fitness = fitness
+        return (dE, val)
+
+    def anneal(self, Iterations:int, Schedule:int) -> Tuple[List[int], List[float]]:
+        dist = []
+        iterations = []
+        for ni in range(Iterations):
+            for ns in range(Schedule):
+                self.attempt_swap()
+                dist.append(self.route.distance)
+                iterations.append(self.Iter)
+            self.T = self.T*(1-self.dT)
+        return (iterations, dist)
+
 def generate_points(
         N=20,
         maxPos:Point2D=Point2D(x=100,y=100)
@@ -108,40 +149,26 @@ def generate_points(
         ]
 
 
+
+
 def main(*args) -> None:
     plt.ion()
     N = 50
-    IterMax = 1000000000
     route = Route(generate_points(N))
+    TSP = SimAnneal(route, dT=.01)
     p = route.plot()
-    Str = str(route)
-    T = .5
-    dT = .001
-    dE = 0.
-    d = []
-    for n in range(IterMax):
-        indx = random.sample(range(N), k=2)
-        d.append(route.distance)
-        dE = N*route.swap_direction(indx[0], indx[1])/route.distance
-        val = math.exp(-dE/T)
-        if val<=random.random():
-            route.swap_direction(indx[0], indx[1])
-        if not (n%100):
-            T = T*(1-dT)
-            Str = f"{n}: {route.distance:.2f}, T = {T:.4g}, dE = {dE:.4g}, {val:.3g}"
-            print(Str)
-            plt.gca().clear()
-            # route.plot()
-            plt.plot(d)
-            plt.title(Str)
-            plt.draw()
-            plt.pause(1e-3)
-
-    print(Str)
-    print(str(route))
-    route.plot()
-    plt.show()
-
+    dist = []
+    for n in range(1000):
+        (_, d) = TSP.anneal(1, 10000)
+        dist += d
+        Str = f"{n}: {route.distance:.2f}, T = {TSP.T:.4g}"
+        print(Str)
+        plt.gca().clear()
+        route.plot()
+        # plt.plot(dist)
+        plt.title(Str)
+        plt.draw()
+        plt.pause(1e-3)
 
 if __name__ == "__main__":
     main(sys.argv)
