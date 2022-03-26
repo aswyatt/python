@@ -1,5 +1,5 @@
-import sys
 from typing import Tuple, List
+import sys
 import numpy as np
 import random
 import math
@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 class Point2D:
     """ Defines point in 2D space
 
-    Defines a point (x,y) in 2D space and calculates the distance between this point and a set of points
+    Defines a point (x,y) in 2D space and calculates the distance between this point and another
     """
     def __init__(self, x:float, y:float) -> None:
         self.x = x
@@ -26,15 +26,12 @@ class Point2D:
 
 class Route:
     def __init__(self, route:List[Point2D]) -> None:
-        """ Initialise a route as a list of points with a distance and fitness score.
+        """ Initialise a route as a list of points with a total distance to circumnavigate them (back to the first point).
 
         Distance is the total Euclidean distance between adjacent points along the route, with periodic boundary conditions (i.e. last point is adjacent to first point).
-
-        Fitness score is simple the inverse of the total distance along the route.
         """
         self.route = route
         self.distance = self._calc_distance()
-        self.fitness = self._calc_fitness()
 
     def __repr__(self) -> str:
         Str = "["
@@ -46,11 +43,13 @@ class Route:
     def _calc_distance(self, index=None) -> float:
         """ Calculate distance to traverse (part) of route
 
-        if index is None: calculate distance through whole route
+        If index is None: calculate distance through whole route back to start
 
-        else if index is scalar: calculate distance from points immediately before and after current point to current point
+        If index is scalar: calculate sum of distance from points immediately before and after current point to current point
 
-        else calculate distance between points specified in list
+        Otherwise calculate distance between points specified in list (non-periodic)
+
+        The distance of the route is not updated
         """
         N = len(self.route)
         total = 0
@@ -68,61 +67,73 @@ class Route:
             total += self.route[rng[n]].distance(self.route[rng[n+1]])
         return total
 
-    def _calc_fitness(self) -> float:
-        return 1/self.distance
+    def _swap_points(self, index1: int, index2:int) -> None:
+        """ Swap two points in list and nothing else """
+        r = self.route
+        r[index1], r[index2] = r[index2], r[index1]
 
-    def swap_direction(self, index1: int, index2: int=None) -> float:
-        route = self.route
-        N = len(route)
+    def swap_points(self, index1: int, index2: int=None) -> float:
+        """ Swap the position of two points along the route
+
+        If only one point is selected, it is swapped with the next point along the route.
+
+        The difference in the route distance before and after switching is calculated and this difference is returned by the function
+        """
         if index2 is None:
-            index2 = (index1+1) % N
+            index2 = (index1+1) % len(self)
         old_dist = self._calc_distance(index1) + self._calc_distance(index2)
-        route[index1], route[index2] = route[index2], route[index1]  # Swap adjacent points on route
+
+        # Swap adjacent points on route and calculate change in distance
+        self._swap_points(index1, index2)
         new_dist = self._calc_distance(index1) + self._calc_distance(index2)
         delta = new_dist - old_dist
         self.distance += delta
-        self.fitness = self._calc_fitness()
         return delta
 
+    def __len__(self) -> int:
+        return len(self.route)
+
+    def extract(self)->Tuple[List[float],List[float]]:
+        """ Returns two lists: x and y co-ordinates of points in route """
+        return [p.x for p in self.route], [p.y for p in self.route]
+
     def plot(self) -> None:
-        x = []
-        y = []
-        for p in self.route:
-            x.append(p.x)
-            y.append(p.y)
+        """ Simple plot of route (WIP) """
+        (x,y) = self.extract()
         x.append(self.route[0].x)
         y.append(self.route[0].y)
         return plt.plot(x, y, "o-")
 
 
 class SimAnneal:
-    """ Simulated annealing class for TSP
-    """
+    """ Simulated annealing class for TSP """
     def __init__(self, route:Route, T0:float=1, dT:float=.1) -> None:
         self.route = route
         self.T = T0
         self.dT = dT
         self.Iter = 0
 
+    def _calculate_energy(self, delta):
+        return len(self.route) * delta / self.route.distance
+
+    def _select_points(self, k:int=2) -> List[int]:
+        return random.sample(range(len(self.route)), k=k)
 
     def attempt_swap(self) -> Tuple[float, float]:
         """ Attempt to swap two random points
 
         Greedy swap if better, otherwise with probability P = exp(-dE/T) where dE = N*dist_incr/total_distance
         """
-        route = self.route
-        N = len(route.route)
-        indx = random.sample(range(N), k=2)
-        dist = route.distance
-        fitness = route.fitness
-        dE = N*route.swap_direction(indx[0], indx[1])/dist
+        indx = self._select_points(2)
+        dist = self.route.distance
+        delta = self.route.swap_points(indx[0], indx[1])
+        dE = self._calculate_energy(delta)
         val = math.exp(-2*dE/self.T)
         if val<=random.random():
             #   Return to original value
-            route.route[indx[0]], route.route[indx[1]] = route.route[indx[1]], route.route[indx[0]]
-            route.distance = dist
-            route.fitness = fitness
-        return (dE, val)
+            self.route._swap_points(indx[0], indx[1])
+            self.route.distance = dist
+        return (delta, dE, val)
 
     def anneal(self, Iterations:int, Schedule:int) -> Tuple[List[int], List[float]]:
         dist = []
@@ -135,12 +146,12 @@ class SimAnneal:
             self.T = self.T*(1-self.dT)
         return (iterations, dist)
 
+
 def generate_points(
         N=20,
         maxPos:Point2D=Point2D(x=100,y=100)
     ) -> List[Point2D]:
-    """ Generate random list of points
-    """
+    """ Generate random list of points """
     return [
         Point2D(
             x=random.random()*maxPos.x,
@@ -149,12 +160,18 @@ def generate_points(
         ]
 
 
+def generate_route(N:int=None) -> Route:
+    if N is None:
+        P = generate_points()
+    else:
+        P = generate_points(N)
+    return Route(P)
 
 
 def main(*args) -> None:
     plt.ion()
     N = 50
-    route = Route(generate_points(N))
+    route = generate_route(N)
     TSP = SimAnneal(route, dT=.01)
     p = route.plot()
     dist = []
