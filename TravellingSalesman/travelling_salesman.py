@@ -33,6 +33,9 @@ class Route:
         self.route = route
         self.distance = self._calc_distance()
 
+    def Copy(self):
+        return Route(self.route[:])
+
     def __repr__(self) -> str:
         Str = "["
         for p in self.route:
@@ -116,8 +119,8 @@ class SimAnneal:
     def _calculate_energy(self, delta):
         return len(self.route) * delta / self.route.distance
 
-    def _select_points(self, k:int=2) -> List[int]:
-        return random.sample(range(len(self.route)), k=k)
+    def _select_points(self, k:int=2, counts:List[int]=None) -> List[int]:
+        return random.sample(range(len(self.route)), k=k, counts=counts)
 
     def attempt_swap(self) -> Tuple[float, float]:
         """ Attempt to swap two random points
@@ -147,6 +150,24 @@ class SimAnneal:
         return (iterations, dist)
 
 
+class SimAnnealRanked(SimAnneal):
+    """Subclass of SimAnneal with weighted point selection
+
+    Instead of selecting two points completely randomly, the probability of selecting any given point increases with the time since it was last selected
+    """
+    def __init__(self, route:Route, T0:float=1, dT:float=0.1, init_count:int=1) -> None:
+        super().__init__(route, T0, dT)
+        self.init_count = init_count
+        self.ranking = [init_count]*len(route)
+
+    def _select_points(self, k:int=2) -> List[int]:
+        indx=super()._select_points(k=k, counts=self.ranking)
+        self.ranking = [r+1 for r in self.ranking]
+        for n in indx:
+            self.ranking[n] = self.init_count
+        return indx
+
+
 def generate_points(
         N=20,
         maxPos:Point2D=Point2D(x=100,y=100)
@@ -171,17 +192,24 @@ def generate_route(N:int=None) -> Route:
 def main(*args) -> None:
     plt.ion()
     N = 50
+    ITER = 10000
+    dT = 0.01
     route = generate_route(N)
-    TSP = SimAnneal(route, dT=.01)
-    p = route.plot()
+    TSP = SimAnneal(route.Copy(), dT=dT)
+    TSPR = SimAnnealRanked(route.Copy(), dT=dT, init_count=10)
+    p = TSPR.route.plot()
     dist = []
+    distR = []
     for n in range(1000):
-        (_, d) = TSP.anneal(1, 10000)
+        (_, d) = TSP.anneal(1, ITER)
         dist += d
-        Str = f"{n}: {route.distance:.2f}, T = {TSP.T:.4g}"
+        (_, d) = TSPR.anneal(1, ITER)
+        distR += d
+        Str = f"{n}: {TSP.route.distance:.2f}, {TSPR.route.distance:.2f}, T = {TSPR.T:.4g}"
         print(Str)
         plt.gca().clear()
-        route.plot()
+        TSP.route.plot()
+        TSPR.route.plot()
         # plt.plot(dist)
         plt.title(Str)
         plt.draw()
