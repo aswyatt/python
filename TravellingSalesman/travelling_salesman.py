@@ -1,6 +1,6 @@
 from typing import Tuple, List
 import sys
-import numpy as np
+# import numpy as np
 import random
 import math
 import matplotlib.pyplot as plt
@@ -110,11 +110,11 @@ class Route:
 
 class SimAnneal:
     """ Simulated annealing class for TSP """
-    def __init__(self, route:Route, T0:float=1, dT:float=.1) -> None:
+    def __init__(self, route:Route, initial_temperature:float=1.0, temperature_decrement:float=.1) -> None:
         self.route = route
-        self.T = T0
-        self.dT = dT
-        self.Iter = 0
+        self.temperature = initial_temperature
+        self.temperature_decrement = temperature_decrement
+        self.iteration = 0
 
     def _calculate_energy(self, delta):
         return len(self.route) * delta / self.route.distance
@@ -131,23 +131,23 @@ class SimAnneal:
         dist = self.route.distance
         delta = self.route.swap_points(indx[0], indx[1])
         dE = self._calculate_energy(delta)
-        val = math.exp(-2*dE/self.T)
+        val = math.exp(-2*dE/self.temperature)
         if val<=random.random():
             #   Return to original value
             self.route._swap_points(indx[0], indx[1])
             self.route.distance = dist
         return (delta, dE, val)
 
-    def anneal(self, Iterations:int, Schedule:int) -> Tuple[List[int], List[float]]:
-        dist = []
-        iterations = []
-        for ni in range(Iterations):
-            for ns in range(Schedule):
+    def anneal(self, iterations:int, schedule:int) -> Tuple[List[int], List[float]]:
+        distance = []
+        iteration = []
+        for ni in range(iterations):
+            for ns in range(schedule):
                 self.attempt_swap()
-                dist.append(self.route.distance)
-                iterations.append(self.Iter)
-            self.T = self.T*(1-self.dT)
-        return (iterations, dist)
+                distance.append(self.route.distance)
+                iteration.append(self.iteration)
+            self.temperature = self.temperature*(1-self.temperature_decrement)
+        return (iteration, distance)
 
 
 class SimAnnealRanked(SimAnneal):
@@ -155,16 +155,16 @@ class SimAnnealRanked(SimAnneal):
 
     Instead of selecting two points completely randomly, the probability of selecting any given point increases with the time since it was last selected
     """
-    def __init__(self, route:Route, T0:float=1, dT:float=0.1, init_count:int=1) -> None:
-        super().__init__(route, T0, dT)
-        self.init_count = init_count
-        self.ranking = [init_count]*len(route)
+    def __init__(self, route:Route, initial_temperature:float=1, temperature_decrement:float=0.1, initial_rank:int=1) -> None:
+        super().__init__(route, initial_temperature, temperature_decrement)
+        self.initial_rank = initial_rank
+        self.rank = [initial_rank]*len(route)
 
     def _select_points(self, k:int=2) -> List[int]:
-        indx=super()._select_points(k=k, counts=self.ranking)
-        self.ranking = [r+1 for r in self.ranking]
+        indx=super()._select_points(k=k, counts=self.rank)
+        self.rank = [r+1 for r in self.rank]
         for n in indx:
-            self.ranking[n] = self.init_count
+            self.rank[n] = self.initial_rank
         return indx
 
 
@@ -195,8 +195,8 @@ def main(*args) -> None:
     ITER = 10000
     dT = 0.01
     route = generate_route(N)
-    TSP = SimAnneal(route.Copy(), dT=dT)
-    TSPR = SimAnnealRanked(route.Copy(), dT=dT, init_count=10)
+    TSP = SimAnneal(route.Copy(), temperature_decrement=dT)
+    TSPR = SimAnnealRanked(route.Copy(), temperature_decrement=dT, initial_rank=10)
     p = TSPR.route.plot()
     dist = []
     distR = []
@@ -205,7 +205,7 @@ def main(*args) -> None:
         dist += d
         (_, d) = TSPR.anneal(1, ITER)
         distR += d
-        Str = f"{n}: {TSP.route.distance:.2f}, {TSPR.route.distance:.2f}, T = {TSPR.T:.4g}"
+        Str = f"{n}: {TSP.route.distance:.2f}, {TSPR.route.distance:.2f}, T = {TSPR.temperature:.4g}"
         print(Str)
         plt.gca().clear()
         TSP.route.plot()
