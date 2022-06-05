@@ -4,6 +4,7 @@ import sys
 # import numpy as np
 import random
 import math
+from xmlrpc.client import Boolean
 import matplotlib.pyplot as plt
 
 class Point2D:
@@ -72,7 +73,7 @@ class Route:
             total += self.route[rng[n]].distance(self.route[rng[n+1]])
         return total
 
-    def _swap_points(self, index1: int, index2:int) -> None:
+    def _swap_points(self, index1: int, index2: int) -> None:
         """ Swap two points in list and nothing else """
         r = self.route
         r[index1], r[index2] = r[index2], r[index1]
@@ -107,16 +108,17 @@ class Route:
         (x,y) = self.extract()
         x.append(self.route[0].x)
         y.append(self.route[0].y)
-        return plt.plot(x, y, "o-")
+        return plt.plot(x, y, "ko-", alpha=.1)
 
 
 class SimAnneal:
     """ Simulated annealing class for TSP """
-    def __init__(self, route:Route, initial_temperature:float=1.0, temperature_decrement:float=.1) -> None:
+    def __init__(self, route:Route, initial_temperature:float=1.0, temperature_decrement:float=.1, beta:float=2.0) -> None:
         self.route = route
         self.temperature = initial_temperature
         self.temperature_decrement = temperature_decrement
         self.iteration = 0
+        self.beta = beta
 
     def _calculate_energy(self, delta) -> float:
         return len(self.route) * delta / self.route.distance
@@ -124,23 +126,31 @@ class SimAnneal:
     def _select_points(self, k:int=2, counts:List[int]=None) -> List[int]:
         return random.sample(range(len(self.route)), k=k, counts=counts)
 
-    def attempt_swap(self) -> Tuple[float, float]:
+    def attempt_swap(self) -> Tuple[bool, float, float, float]:
         """ Attempt to swap two random points
 
         Greedy swap if better, otherwise with probability P = exp(-dE/T) where dE = N*dist_incr/total_distance
+
+        Returns (success, delta, dE, val):
+            success = true if attempted swap was successful
+            delta = Change in distance
+            dE = Change in energy of system
+            val = exp(-2*dE/T)
         """
         indx = self._select_points(2)
         dist = self.route.distance
         delta = self.route.swap_points(indx[0], indx[1])
         dE = self._calculate_energy(delta)
         if dE<=0:
-            return (delta, dE, dE)
-        val = math.exp(-2*dE/self.temperature)
+            return (True, delta, dE, dE)
+        val = math.exp(-self.beta*dE/self.temperature)
+        swapped = True
         if val<=random.random():
             #   Return to original value
+            swapped = False
             self.route._swap_points(indx[0], indx[1])
             self.route.distance = dist
-        return (delta, dE, val)
+        return (swapped, delta, dE, val)
 
     def anneal(self, iterations:int, schedule:int) -> Tuple[List[int], List[float]]:
         distance = []
@@ -173,8 +183,8 @@ class SimAnnealRanked(SimAnneal):
 
 
 class STun(SimAnneal):
-    def __init__(self, route:Route, initial_temperature:float=1.0, temperature_decrement:float=0.1, gamma:float=1.0) -> None:
-        super().__init__(route, initial_temperature, temperature_decrement)
+    def __init__(self, route:Route, initial_temperature:float=1.0, temperature_decrement:float=0.1, beta:float=2.0, gamma:float=1.0) -> None:
+        super().__init__(route, initial_temperature, temperature_decrement, beta)
         self.gamma = gamma
         self.optimum = self.route.distance
         self.f_stun = float("inf")
@@ -185,13 +195,22 @@ class STun(SimAnneal):
         opt = self.optimum
         if dist<opt:
             self.optimum = dist
+            self.f_stun = 0
             return 0
         delta = dist - opt
-        dE = len(self.route) * delta / opt
+        # dE = len(self.route) * delta / opt
+        dE = len(self.route) * delta / dist
         f_stun = 1.0-math.exp(-self.gamma*dE)
         df = f_stun - self.f_stun
         self.f_stun = f_stun
         return df
+
+    def attempt_swap(self) -> Tuple[float, float, float]:
+        f_stun = self.f_stun
+        result = super().attempt_swap()
+        if not result[0]:
+            self.f_stun = f_stun
+        return result
 
 
 def generate_points(
@@ -215,41 +234,75 @@ def generate_route(N:int=None) -> Route:
     return Route(P)
 
 
+# def main(*args) -> None:
+#     """
+#         main function for testing and debugging purposes
+#     """
+#     plt.ion()
+#     NPoints = 50
+#     ITER_SCHED = 1000
+#     ITER_TOTAL = 10000
+#     dT = 0.001
+#     route = generate_route(NPoints)
+#     TSP1 = SimAnneal(route.Copy(), temperature_decrement=dT)
+#     TSP2 = SimAnneal(route.Copy(), temperature_decrement=dT/10)
+#     TSP3 = SimAnneal(route.Copy(), temperature_decrement=dT/2, initial_temperature=.5)
+#     # TSP1 = STun(route.Copy(), temperature_decrement=dT, gamma=10.0)
+#     # TSP2 = STun(route.Copy(), temperature_decrement=dT, initial_temperature=.1)
+#     # TSP3 = STun(route.Copy(), temperature_decrement=dT, initial_temperature=.1)
+#     p = TSP2.route.plot()
+#     dist1 = []
+#     dist2 = []
+#     dist3 = []
+#     for n in range(ITER_TOTAL):
+#         (_, d) = TSP1.anneal(1, ITER_SCHED)
+#         dist1 += d
+#         (_, d) = TSP2.anneal(1, ITER_SCHED)
+#         dist2 += d
+#         (_, d) = TSP3.anneal(1, ITER_SCHED)
+#         dist3 += d
+#         Str = f"{n}: D = [{TSP1.route.distance:.2f}, {TSP2.route.distance:.2f}, {TSP3.route.distance:.2f}], T = [{TSP1.temperature:.4g}, {TSP2.temperature:.4g}, {TSP3.temperature:.4g}]"
+#         print(Str)
+#         plt.gca().clear()
+#         TSP1.route.plot()
+#         TSP2.route.plot()
+#         TSP3.route.plot()
+#         # plt.plot(dist)
+#         plt.title(Str)
+#         plt.draw()
+#         plt.pause(1e-3)
+#     plt.show(block=True)
+
 def main(*args) -> None:
     """
         main function for testing and debugging purposes
     """
     plt.ion()
-    NPoints = 50
-    ITER1 = 1000
-    ITER2 = 10000
-    dT = 0.01
+    NPoints = 100
+    N_TSP = 100
+    ITER_SCHED = N_TSP*10
+    ITER_PLOT = 1
+    ITER_TOTAL = 1000000
     route = generate_route(NPoints)
-    TSP1 = SimAnneal(route.Copy(), temperature_decrement=dT/10)
-    # TSP2 = SimAnneal(route.Copy(), temperature_decrement=dT/10)
-    # TSP3 = SimAnneal(route.Copy(), temperature_decrement=dT/100)
-    # TSP1 = STun(route.Copy(), temperature_decrement=dT, gamma=10.0)
-    TSP2 = STun(route.Copy(), temperature_decrement=dT, gamma=1.0)
-    TSP3 = STun(route.Copy(), temperature_decrement=dT, gamma=0.1)
-    p = TSP2.route.plot()
-    dist1 = []
-    dist2 = []
-    dist3 = []
-    for n in range(ITER2):
-        (_, d) = TSP1.anneal(1, ITER1)
-        dist1 += d
-        (_, d) = TSP2.anneal(1, ITER1)
-        dist2 += d
-        (_, d) = TSP3.anneal(1, ITER1)
-        dist3 += d
-        Str = f"{n}: D = [{TSP1.route.distance:.2f}, {TSP2.route.distance:.2f}, {TSP3.route.distance:.2f}], T = [{TSP1.temperature:.4g}, {TSP2.temperature:.4g}, {TSP3.temperature:.4g}]"
-        print(Str)
+    TSP = [SimAnneal(route.Copy(), temperature_decrement=.01, initial_temperature=.5, beta=3) for n in range(N_TSP)]
+    plt.gca().clear()
+    for tsp in TSP:
+        tsp.route.plot()
+    plt.draw()
+    plt.pause(1)
+    for ni in range(ITER_TOTAL):
+        for tsp in TSP:
+            if tsp.temperature<10*tsp.temperature_decrement:
+                tsp.temperature_decrement/=10
+            tsp.anneal(ITER_PLOT, ITER_SCHED)
         plt.gca().clear()
-        TSP1.route.plot()
-        TSP2.route.plot()
-        TSP3.route.plot()
-        # plt.plot(dist)
-        plt.title(Str)
+        dist = []
+        for tsp in TSP:
+            tsp.route.plot()
+            dist.append(tsp.route.distance)
+        # dist = [tsp.route.distance for tsp in TSP]
+        # mn = min([tsp.route.distance for tsp in TSP])
+        plt.title(f"{ni}: D_min={min(dist):.4g}, D_max={max(dist):.4g}, D_av={sum(dist)/len(dist):.4g}, T={TSP[0].temperature:.4g}, dT={TSP[0].temperature_decrement}")
         plt.draw()
         plt.pause(1e-3)
     plt.show(block=True)
