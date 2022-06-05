@@ -1,3 +1,4 @@
+#   Requires python >=3.9
 from typing import Tuple, List
 import sys
 # import numpy as np
@@ -15,6 +16,7 @@ class Point2D:
         self.y = y
 
     def distance(self, point) -> float:
+        """ Calculates Euclidean distance between self and argument (both Point2D objects) """
         dx = self.x - point.x
         dy = self.y - point.y
         dist = math.sqrt((dx**2) + (dy**2))
@@ -162,7 +164,7 @@ class SimAnnealRanked(SimAnneal):
         self.initial_rank = initial_rank
         self.rank = [initial_rank]*len(route)
 
-    def _select_points(self, k:int=2) -> List[int]:
+    def _select_points(self, k:int=2, counts:List[int]=None) -> List[int]:
         indx=super()._select_points(k=k, counts=self.rank)
         self.rank = [r+1 for r in self.rank]
         for n in indx:
@@ -214,27 +216,33 @@ def generate_route(N:int=None) -> Route:
 
 
 def main(*args) -> None:
+    """
+        main function for testing and debugging purposes
+    """
     plt.ion()
-    N = 50
-    ITER = 1000
+    NPoints = 50
+    ITER1 = 1000
+    ITER2 = 10000
     dT = 0.01
-    route = generate_route(N)
-    # TSP1 = SimAnneal(route.Copy(), temperature_decrement=dT)
-    TSP1 = STun(route.Copy(), temperature_decrement=dT, gamma=10.0)
+    route = generate_route(NPoints)
+    TSP1 = SimAnneal(route.Copy(), temperature_decrement=dT/10)
+    # TSP2 = SimAnneal(route.Copy(), temperature_decrement=dT/10)
+    # TSP3 = SimAnneal(route.Copy(), temperature_decrement=dT/100)
+    # TSP1 = STun(route.Copy(), temperature_decrement=dT, gamma=10.0)
     TSP2 = STun(route.Copy(), temperature_decrement=dT, gamma=1.0)
     TSP3 = STun(route.Copy(), temperature_decrement=dT, gamma=0.1)
     p = TSP2.route.plot()
     dist1 = []
     dist2 = []
     dist3 = []
-    for n in range(1000):
-        (_, d) = TSP1.anneal(1, ITER)
+    for n in range(ITER2):
+        (_, d) = TSP1.anneal(1, ITER1)
         dist1 += d
-        (_, d) = TSP2.anneal(1, ITER)
+        (_, d) = TSP2.anneal(1, ITER1)
         dist2 += d
-        (_, d) = TSP3.anneal(1, ITER)
+        (_, d) = TSP3.anneal(1, ITER1)
         dist3 += d
-        Str = f"{n}: {TSP1.route.distance:.2f}, {TSP2.route.distance:.2f}, {TSP3.route.distance:.2f}, T = {TSP1.temperature:.4g}"
+        Str = f"{n}: D = [{TSP1.route.distance:.2f}, {TSP2.route.distance:.2f}, {TSP3.route.distance:.2f}], T = [{TSP1.temperature:.4g}, {TSP2.temperature:.4g}, {TSP3.temperature:.4g}]"
         print(Str)
         plt.gca().clear()
         TSP1.route.plot()
@@ -244,6 +252,7 @@ def main(*args) -> None:
         plt.title(Str)
         plt.draw()
         plt.pause(1e-3)
+    plt.show(block=True)
 
 if __name__ == "__main__":
     main(sys.argv)
