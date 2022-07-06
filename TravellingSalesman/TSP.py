@@ -35,7 +35,7 @@ class Route:
         Distance is the total Euclidean distance between adjacent points along the route, with periodic boundary conditions (i.e. last point is adjacent to first point).
         """
         self.route = route
-        self.length = self.total_length()
+        self.length = self.calc_length()
 
     def copy(self):
         return Route(self.route[:])
@@ -50,7 +50,7 @@ class Route:
     def reverse(self):
         self.route.reverse()
 
-    def total_length(self) -> float:
+    def calc_length(self) -> float:
         r = self.route
         z = zip(r, r[1:]+[r[0]])
         L = sum([r1.distance_to(r2) for (r1,r2) in z])
@@ -104,6 +104,9 @@ class SimAnneal:
         self.temperature_decrement = temperature_decrement
         self.iteration = 0
         self.beta = beta
+        self.history = 1000
+        self.success_rate = [1]*6
+        # self.attempts = [1]*6
 
     def _update_success(self, energy_change:float) -> Tuple[bool, float]:
         success = True
@@ -115,31 +118,73 @@ class SimAnneal:
             prob = 1.0
         return (success, prob)
 
-    def _move_point(self) -> float:
-        r = self.route
-        l0 = r.length
-        p = r.route.pop(self._select_points(1)[0])
-        dl = l0 - r.length
+    def _extract_route(self, ind:List[int]) -> List:
+        r = self.route.route
+        (ind1, ind2) = (min(ind), max(ind))
+        ind1 = max(ind1, 1)
+        r1 = r[ind1:ind2]
+        self.route = Route(r[:ind1] + r[ind2:])
+        return r1
+
+    def _insert_route(self, route:List, indx:int) -> None:
+        r = self.route.route
+        self.route = Route(r[:indx] + route + r[indx:])
+
+    def _modify_section(self, reverse:bool=False) -> Tuple[bool, float, float, float]:
+        l0 = self.route.length
+        ind = self._select_points(2)
+        r = self._extract_route(ind)
+        if reverse:
+            r.reverse()
+            self._insert_route(r, ind[0])
+        else:
+            self._insert_route(r, self._select_points(1)[0])
+        length_change = self.route.length-l0
+        energy_change = self._energy_change(length_change)
+        (success, prob) = self._update_success(energy_change)
+        return (success, prob, energy_change, length_change)
+
+    def _move_point(self) -> Tuple[bool, float, float, float]:
+        r = self.route.copy()
+        indx = self._select_points(1)[0] - 1
+        p = r.route.pop(indx)
+        pm = r.route[indx-1]
+        pp = r.route[indx]
+        dl = pm.distance_to(pp) - \
+            (p.distance_to(pm) + p.distance_to(pp))
         N = len(r)
         max_prob = 0
         min_length_change = 0
         min_energy_change = 0
         for n in random.sample(range(N), N):
-            l1 = p.distance_to(r.route[n-1])
-            l2 = p.distance_to(r.route[n])
-            length_change = l1+l2-dl
+            pm = r.route[n-1]
+            pp = r.route[n]
+            length_change = dl + \
+                p.distance_to(pm) + p.distance_to(pp) - pm.distance_to(pp)
             energy_change = self._energy_change(length_change)
             (success, prob) = self._update_success(energy_change)
-            if prob>max_prob:
+            if success:
+                r.route.insert(n, p)
+                r.length += length_change
+                self.route = r
+                return (success, prob, energy_change, length_change)
+            elif prob>max_prob:
                 max_prob = prob
                 min_length_change = length_change
                 min_energy_change = energy_change
-            if success:
-                r.route.insert(n, p)
-                return (success, prob, energy_change, length_change)
         return (False, max_prob, min_energy_change, min_length_change)
 
-
+    def _switch_direction(self) -> Tuple[bool, float, float, float]:
+        indx = self._select_points(1)[0]-1
+        r = self.route.route
+        dl1 = r[indx-2].distance_to(r[indx-1]) + r[indx].distance_to(r[indx+1])
+        r.insert(indx-1, r.pop(indx))
+        dl2 = r[indx-2].distance_to(r[indx-1]) + r[indx].distance_to(r[indx+1])
+        length_change = dl2-dl1
+        self.route.length += length_change
+        energy_change = self._energy_change(length_change)
+        (success, prob) = self._update_success(energy_change)
+        return (success, prob, energy_change, length_change)
 
     def _swap_points(self) -> Tuple[bool, float, float, float]:
         """ Swap the locations of two random (unique) points along the route """
@@ -149,8 +194,54 @@ class SimAnneal:
         (success, prob) = self._update_success(energy_change)
         return (success, prob, energy_change, length_change)
 
+    def _move_closest(self) -> Tuple[bool, float, float, float]:
+        r = self.route.route
+        ind0 = self._select_points(1)[0]-1
+        p0 = r.pop(ind0)
+        dist = float("inf")
+        ind1 = None
+        for (p, n) in zip(r, range(len(r))):
+            d = p0.distance_to(p)
+            if d<dist:
+                ind1 = n
+                dist = d
+        ind2 = (ind1+1) % len(r)
+        dl1 = p0.distance_to(r[ind0-1]) + p0.distance_to(r[ind0])
+        dm = p0.distance_to(r[ind1-1])
+        dp = p0.distance_to(r[ind2])
+        dl2 = dist
+        if dp<dm:
+            dl2 += dp
+            r.insert(ind2, p0)
+        else:
+            dl2 += dm
+            r.insert(ind1, p0)
+        length_change = dl2-dl1
+        self.route.length += length_change
+        energy_change = self._energy_change(length_change)
+        (success, prob) = self._update_success(energy_change)
+        return (success, prob, energy_change, length_change)
+
     def _iterate_method(self) -> Tuple[bool, float, float, float]:
         return self._move_point()
+        choice = random.choices(range(6), self.success_rate)[0]
+        if choice==0:
+            ret = self._modify_section(False)
+        elif choice==1:
+            ret = self._modify_section(True)
+        elif choice==2:
+            ret = self._switch_direction()
+        elif choice==3:
+            ret = self._swap_points()
+        elif choice==4:
+            ret = self._move_point()
+        else:
+            ret = self._move_closest()
+
+        for n in range(6):
+            self.success_rate[choice] = (n==choice)*(ret[0]/self.history + (1-1/self.history)*self.success_rate[choice]) + (n!=choice)*(self.success_rate[choice] + .01/self.history)
+
+        return ret
 
     def iterate(self) -> Tuple[bool, float, float, float]:
         """ Attempt an iteration improvement. Keep the modification with probability P=min(1, exp(-beta*dE/T)), otherwise return to original.
@@ -259,67 +350,34 @@ def generate_route(N: int = None) -> Route:
     return Route(generate_points(N))
 
 
-# def main(*args) -> None:
-#     """
-#         main function for testing and debugging purposes
-#     """
-#     plt.ion()
-#     NPoints = 50
-#     ITER_SCHED = 1000
-#     ITER_TOTAL = 10000
-#     dT = 0.001
-#     route = generate_route(NPoints)
-#     TSP1 = SimAnneal(route.Copy(), temperature_decrement=dT)
-#     TSP2 = SimAnneal(route.Copy(), temperature_decrement=dT/10)
-#     TSP3 = SimAnneal(route.Copy(), temperature_decrement=dT/2, initial_temperature=.5)
-#     # TSP1 = STun(route.Copy(), temperature_decrement=dT, gamma=10.0)
-#     # TSP2 = STun(route.Copy(), temperature_decrement=dT, initial_temperature=.1)
-#     # TSP3 = STun(route.Copy(), temperature_decrement=dT, initial_temperature=.1)
-#     p = TSP2.route.plot()
-#     dist1 = []
-#     dist2 = []
-#     dist3 = []
-#     for n in range(ITER_TOTAL):
-#         (_, d) = TSP1.anneal(1, ITER_SCHED)
-#         dist1 += d
-#         (_, d) = TSP2.anneal(1, ITER_SCHED)
-#         dist2 += d
-#         (_, d) = TSP3.anneal(1, ITER_SCHED)
-#         dist3 += d
-#         Str = f"{n}: D = [{TSP1.route.distance:.2f}, {TSP2.route.distance:.2f}, {TSP3.route.distance:.2f}], T = [{TSP1.temperature:.4g}, {TSP2.temperature:.4g}, {TSP3.temperature:.4g}]"
-#         print(Str)
-#         plt.gca().clear()
-#         TSP1.route.plot()
-#         TSP2.route.plot()
-#         TSP3.route.plot()
-#         # plt.plot(dist)
-#         plt.title(Str)
-#         plt.draw()
-#         plt.pause(1e-3)
-#     plt.show(block=True)
-
 def main(*args) -> None:
-    """
-        main function for testing and debugging purposes
-    """
-    plt.ion()
-    NPoints = 20
-    N_TSP = 20
-    ITER_SCHED = N_TSP*10
-    ITER_PLOT = 10
-    ITER_TOTAL = 100000
-    dT = .01
-    T0 = 5
-    # route = generate_route(NPoints)
-    # TSP = [SimAnneal(route.copy(), temperature_decrement=.01,
-    #                  initial_temperature=.5, beta=3) for n in range(N_TSP)]
+    #   Simulation parameters
+    IDENTICAL_START = False
+    NPoints = 1000
+    N_TSP = 3
+    ITER_SCHED = N_TSP**2
+    ITER_PLOT = 1
+    ITER_TOTAL = 1000000
+    dT = .1
+    T0 = 1
+    BETA = 3
+
     points = generate_points(NPoints)
-    TSP = [SimAnneal(
-        Route(random.sample(points, NPoints)),
-        temperature_decrement=dT,
-        initial_temperature=T0,
-        beta=3) for n in range(N_TSP)]
+    if IDENTICAL_START:
+        TSP = [SimAnneal(
+            Route(points),
+            temperature_decrement=dT,
+            initial_temperature=T0,
+            beta=BETA) for n in range(N_TSP)]
+    else:
+        TSP = [SimAnneal(
+            Route(random.sample(points, NPoints)),
+            temperature_decrement=dT,
+            initial_temperature=T0,
+            beta=3) for n in range(N_TSP)]
+    # plt.ion()   #   enable interactive mode
     plt.gca().clear()
+    plt.get_current_fig_manager().full_screen_toggle()
     for tsp in TSP:
         tsp.route.plot()
     plt.draw()
