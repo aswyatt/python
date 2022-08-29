@@ -3,10 +3,12 @@ channels:
   - defaults
 dependencies:
   - python>=3.10
+  - pip
   - numpy
   - pyqtgraph
   - matplotlib
   - seaborn
+  - python-graphviz
   - jupyterlab
   - notebook
   - sympy
@@ -16,4 +18,5 @@ dependencies:
   - rope
   - autopep8
   - h5py
-  - pip
+  - pip:
+      - neat-python
