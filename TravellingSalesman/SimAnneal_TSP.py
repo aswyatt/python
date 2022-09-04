@@ -1,5 +1,16 @@
 from TSP import *
 
+#   Simulation parameters
+IDENTICAL_START = False
+NPoints = 100
+N_TSP = 10
+ITER_SCHED = N_TSP**2
+ITER_PLOT = 1
+ITER_TOTAL = 1000000
+dT = .01
+T0 = 1
+BETA = 3
+
 class SimAnneal:
     """ Simulated annealing class for TSP """
 
@@ -244,17 +255,6 @@ class STun(SimAnneal):
         return result
 
 def main(*args) -> None:
-    #   Simulation parameters
-    IDENTICAL_START = False
-    NPoints = 100
-    N_TSP = 10
-    ITER_SCHED = N_TSP**2
-    ITER_PLOT = 1
-    ITER_TOTAL = 1000000
-    dT = .01
-    T0 = 1
-    BETA = 3
-
     points = generate_points(NPoints)
     if IDENTICAL_START:
         TSP = [SimAnneal(

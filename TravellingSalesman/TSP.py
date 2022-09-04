@@ -6,7 +6,6 @@ import random
 import math
 import matplotlib.pyplot as plt
 
-
 class Point2D:
     """ Defines point in 2D space
 
@@ -87,15 +86,22 @@ class Route:
         """ Returns two lists: ([x], [y]]) of points in route """
         return [p.x for p in self.route], [p.y for p in self.route]
 
-    def plot(self) -> None:
+    def plot(self, style:str = "o-k", alpha:float = 0.1) -> None:
         """ Simple plot of route (WIP) """
         (x, y) = self.extract()
         x.append(self.route[0].x)
         y.append(self.route[0].y)
-        return plt.plot(x, y, "ko-", alpha=.1)
+        return plt.plot(x, y, style, alpha=alpha)
 
-    def NN_Solution(self, Start:int = 0) -> None:
-        pass
+    def NN_Solution(self, start:int = 0) -> None:
+        U = self.route
+        P = U.pop(start)
+        R = [P]
+        while U:
+            d = [P.distance_to(p) for p in U]
+            P = U.pop(d.index(min(d)))
+            R.append(P)
+        self.route = R
 
 
 def generate_points(N=20, maxPos=Point2D(x=100, y=100)) -> List[Point2D]:
@@ -110,7 +116,13 @@ def generate_route(N: int = None) -> Route:
 
 
 def main(*args) -> None:
-    pass
+    R = Route(generate_points(20))
+    plt.gca().clear()
+    plt.get_current_fig_manager().full_screen_toggle()
+    R.plot(alpha=1)
+    R.NN_Solution()
+    R.plot(style="^:r", alpha=1)
+    plt.plot(R.route[0].x, R.route[0].y, "or", markersize=20, alpha=.5)
 
 if __name__ == "__main__":
     main(sys.argv)
