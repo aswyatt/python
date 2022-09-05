@@ -1,7 +1,6 @@
 name: Basic
 channels:
   - defaults
-  - cogsci
 dependencies:
   - python>=3.10
   - pip
@@ -15,10 +14,10 @@ dependencies:
   - sympy
   - pandas
   - scipy
-  - pygame
   - pylint
   - rope
   - autopep8
   - h5py
   - pip:
       - neat-python
+      - pygame
