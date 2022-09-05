@@ -112,12 +112,11 @@ class Pipe:
         return (t_point or b_point) is not None
 
 
-class Base:
-    VEL = 5
-    IMG = IMGS["Base"]
-    WIDTH = IMGS["Base"].get_width()
-
-    def __init__(self, y:int) -> None:
+class ScrollingItem:
+    def __init__(self, img:pygame.Surface, vel:int = 1, y:int = 0) -> None:
+        self.IMG = img
+        self.VEL = vel
+        self.WIDTH = img.get_width()
         self.y = y
         self.x = [0, self.WIDTH]
 
@@ -129,22 +128,15 @@ class Base:
         for x in self.x:
             win.blit(self.IMG, (x, self.y))
 
+class Base(ScrollingItem):
+    def __init__(self, y:int) -> None:
+        ScrollingItem.__init__(self, IMGS["Base"], 5, y)
 
-class Background:
-    VEL = 1
-    IMG = IMGS["BG"]
-    WIDTH = IMGS["BG"].get_width()
 
+class Background(ScrollingItem):
     def __init__(self) -> None:
-        self.x = [0, self.WIDTH]
+        ScrollingItem.__init__(self, IMGS["BG"], 1, 0)
 
-    def move(self) -> None:
-        W = self.WIDTH
-        self.x = [(x+W-self.VEL)%(2*W)-W for x in self.x]
-
-    def draw(self, win:pygame.Surface) -> None:
-        for x in self.x:
-            win.blit(self.IMG, (x, 0))
 
 class FlappyBird:
     WIN_WIDTH = IMGS["BG"].get_width()

@@ -4,7 +4,7 @@ import os
 
 PATH = os.path.dirname(__file__)
 
-def LoadImage(file: str):
+def LoadImage(file: str) -> pygame.Surface:
     return pygame.transform.scale2x(
         pygame.image.load(os.path.join(PATH, "imgs", file))
         )
