@@ -6,6 +6,8 @@ import time
 import os
 import random
 
+pygame.font.init()
+
 #   Load images
 IMGS = {
     "Bird": [LoadImage(f"bird{n+1}.png") for n in range(3)],
@@ -13,8 +15,6 @@ IMGS = {
     "Base": LoadImage("base.png"),
     "BG": LoadImage("bg.png")
 }
-
-
 class Bird:
     IMGS = IMGS["Bird"]
     MAX_ROTATION = 25
@@ -98,7 +98,7 @@ class Pipe:
         win.blit(self.PIPE_TOP, (self.x, self.top))
         win.blit(self.PIPE_BOTTOM, (self.x, self.bottom))
 
-    def collide(self, bird:Bird) -> bool:
+    def CheckCollision(self, bird:Bird) -> bool:
         bird_mask = bird.get_mask()
         top_mask = pygame.mask.from_surface(self.PIPE_TOP)
         bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
@@ -110,6 +110,14 @@ class Pipe:
         t_point = bird_mask.overlap(top_mask, top_offset)
         b_point = bird_mask.overlap(bottom_mask, bottom_offset)
         return (t_point or b_point) is not None
+
+    def CheckPassed(self, bird:Bird) -> bool:
+        x = self.x + self.PIPE_TOP.get_width()
+        self.passed = (not self.passed and bird.x>x)
+        return self.passed
+
+    def CheckRemove(self) -> bool:
+        return self.x<-self.PIPE_TOP.get_width()
 
 
 class ScrollingItem:
@@ -139,6 +147,7 @@ class Background(ScrollingItem):
 
 
 class FlappyBird:
+    FONT = pygame.font.SysFont("comicsans", 50)
     WIN_WIDTH = IMGS["BG"].get_width()
     WIN_HEIGHT = 800
     FPS = 30
@@ -157,6 +166,8 @@ class FlappyBird:
         self.BG.draw(self.win)
         for pipe in self.pipes:
             pipe.draw(self.win)
+        text = self.FONT.render(f"Score: {self.score}", 1, (255,255,255))
+        self.win.blit(text, (self.WIN_WIDTH-10-text.get_width(), 10))
         self.base.draw(self.win)
         self.bird.draw(self.win)
         pygame.display.update()
@@ -176,13 +187,11 @@ class FlappyBird:
             rem = []
             add_pipe = False
             for pipe in self.pipes:
-                if pipe.collide(self.bird):
+                if pipe.CheckCollision(self.bird):
                     pass
-                if pipe.x<-pipe.PIPE_TOP.get_width():
+                if pipe.CheckRemove():
                     rem.append(pipe)
-                if not pipe.passed and pipe.x<self.bird.x:
-                    pipe.passed = True
-                    add_pipe = True
+                add_pipe = pipe.CheckPassed(self.bird)
                 pipe.move()
 
             if add_pipe:
