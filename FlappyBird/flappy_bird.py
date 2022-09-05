@@ -25,6 +25,8 @@ class Bird:
     JUMP_VEL = -10.5
     IMG_ORDER = [0, 1, 2, 1]
     GLIDE_INDX = 1
+    MIN_DISP = -5
+    MAX_DISP = 16
 
     def __init__(self, x:int, y:int) -> None:
         self.x = x
@@ -43,7 +45,11 @@ class Bird:
 
     def move(self) -> None:
         self.tick_count += 1
-        dy = Clamp(self.tick_count*(self.vel + 1.5*self.tick_count), -2, 16)
+        dy = Clamp(
+            self.tick_count*(self.vel + 1.5*self.tick_count),
+            self.MIN_DISP,
+            self.MAX_DISP
+        )
         self.y += dy
 
         #   Could be achieved using logic multiplication only
@@ -89,7 +95,7 @@ class Pipe:
     def set_height(self) -> None:
         self.height = random.randrange(50, 450)
         self.top = self.height - self.PIPE_TOP.get_height()
-        self.bottom = self.height + self.GAP
+        self.bottom = self.height + self.GAP - random.randrange(50)
 
     def move(self) -> None:
         self.x -= self.VEL
@@ -140,6 +146,9 @@ class Base(ScrollingItem):
     def __init__(self, y:int) -> None:
         ScrollingItem.__init__(self, IMGS["Base"], 5, y)
 
+    def CheckCollision(self, bird:Bird) -> bool:
+        return (bird.y + bird.img.get_height() >= self.y)
+
 
 class Background(ScrollingItem):
     def __init__(self) -> None:
@@ -150,11 +159,15 @@ class FlappyBird:
     FONT = pygame.font.SysFont("comicsans", 50)
     WIN_WIDTH = IMGS["BG"].get_width()
     WIN_HEIGHT = 800
-    FPS = 30
 
-    def __init__(self) -> None:
+    def __init__(self, KeyboardInput:bool = False, FPS:int = 30) -> None:
         self.win = pygame.display.set_mode((self.WIN_WIDTH, self.WIN_HEIGHT))
         self.clock = pygame.time.Clock()
+        self.KeyboardInput = KeyboardInput
+        self.FPS = FPS
+        self.reset()
+
+    def reset(self) -> None:
         self.bird = Bird(230,350)
         self.pipes = [Pipe(self.WIN_WIDTH+20)]
         self.base = Base(self.WIN_HEIGHT-70)
@@ -174,21 +187,33 @@ class FlappyBird:
 
     def run(self) -> None:
         run = True
+        failed = False
         while run:
             self.clock.tick(self.FPS)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
+                if self.KeyboardInput and event.type==pygame.KEYDOWN:
+                    if failed and event.key == pygame.K_r:
+                        self.reset()
+                        failed = False
+                    if event.key == pygame.K_q:
+                        run = False
+                    if event.key == pygame.K_SPACE:
+                        self.bird.jump()
+
+            if failed:
+                continue
 
             self.BG.move()
             self.base.move()
+            self.bird.move()
 
             rem = []
             add_pipe = False
             for pipe in self.pipes:
-                if pipe.CheckCollision(self.bird):
-                    pass
+                failed = pipe.CheckCollision(self.bird)
                 if pipe.CheckRemove():
                     rem.append(pipe)
                 add_pipe = pipe.CheckPassed(self.bird)
@@ -201,14 +226,18 @@ class FlappyBird:
             for r in rem:
                 self.pipes.remove(r)
 
-            if self.bird.y + self.bird.img.get_height() >= self.base.y:
-                pass
-
-            # self.bird.move()
-            self.draw_window()
+            failed = failed or self.base.CheckCollision(self.bird)
+            if failed:
+                text = self.FONT.render("FAIL", 1, (150, 0, 0))
+                x = (self.WIN_WIDTH-text.get_width())//2
+                y = (self.WIN_HEIGHT-text.get_height())//2
+                self.win.blit(text, (x, y))
+                pygame.display.update()
+            else:
+                self.draw_window()
 
 def main():
-    flappy = FlappyBird()
+    flappy = FlappyBird(True)
     flappy.run()
     pygame.quit()
     quit()
