@@ -72,18 +72,100 @@ class Bird:
         return pygame.mask.from_surface(self.img)
 
 
+class Pipe:
+    GAP = 200
+    VEL = 5
+    PIPE_TOP = pygame.transform.flip(IMGS["Pipe"], False, True)
+    PIPE_BOTTOM = IMGS["Pipe"]
+
+    def __init__(self, x:int) -> None:
+        self.x = x
+        self.height = 0
+        self.top = 0
+        self.bottom = 0
+        self.passed = False
+        self.set_height()
+
+    def set_height(self) -> None:
+        self.height = random.randrange(50, 450)
+        self.top = self.height - self.PIPE_TOP.get_height()
+        self.bottom = self.height + self.GAP
+
+    def move(self) -> None:
+        self.x -= self.VEL
+
+    def draw(self, win:pygame.Surface) -> None:
+        win.blit(self.PIPE_TOP, (self.x, self.top))
+        win.blit(self.PIPE_BOTTOM, (self.x, self.bottom))
+
+    def collide(self, bird:Bird) -> bool:
+        bird_mask = bird.get_mask()
+        top_mask = pygame.mask.from_surface(self.PIPE_TOP)
+        bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
+
+        y = round(bird.y)
+        top_offset = (self.x-bird.x, self.top-y)
+        bottom_offset = (self.x-bird.x, self.bottom-y)
+
+        t_point = bird_mask.overlap(top_mask, top_offset)
+        b_point = bird_mask.overlap(bottom_mask, bottom_offset)
+        return (t_point or b_point) is not None
+
+
+class Base:
+    VEL = 5
+    IMG = IMGS["Base"]
+    WIDTH = IMGS["Base"].get_width()
+
+    def __init__(self, y:int) -> None:
+        self.y = y
+        self.x = [0, self.WIDTH]
+
+    def move(self) -> None:
+        W = self.WIDTH
+        self.x = [(x+W-self.VEL)%(2*W)-W for x in self.x]
+
+    def draw(self, win:pygame.Surface) -> None:
+        for x in self.x:
+            win.blit(self.IMG, (x, self.y))
+
+
+class Background:
+    VEL = 1
+    IMG = IMGS["BG"]
+    WIDTH = IMGS["BG"].get_width()
+
+    def __init__(self) -> None:
+        self.x = [0, self.WIDTH]
+
+    def move(self) -> None:
+        W = self.WIDTH
+        self.x = [(x+W-self.VEL)%(2*W)-W for x in self.x]
+
+    def draw(self, win:pygame.Surface) -> None:
+        for x in self.x:
+            win.blit(self.IMG, (x, 0))
+
 class FlappyBird:
-    WIN_WIDTH = 500
+    WIN_WIDTH = IMGS["BG"].get_width()
     WIN_HEIGHT = 800
     FPS = 30
 
     def __init__(self) -> None:
         self.win = pygame.display.set_mode((self.WIN_WIDTH, self.WIN_HEIGHT))
         self.clock = pygame.time.Clock()
-        self.bird = Bird(200,200)
+        self.bird = Bird(230,350)
+        self.pipes = [Pipe(self.WIN_WIDTH+20)]
+        self.base = Base(self.WIN_HEIGHT-70)
+        self.BG = Background()
+        self.score = 0
 
     def draw_window(self) -> None:
-        self.win.blit(IMGS["BG"], (0,0))
+        # self.win.blit(IMGS["BG"], (0,0))
+        self.BG.draw(self.win)
+        for pipe in self.pipes:
+            pipe.draw(self.win)
+        self.base.draw(self.win)
         self.bird.draw(self.win)
         pygame.display.update()
 
@@ -91,10 +173,37 @@ class FlappyBird:
         run = True
         while run:
             self.clock.tick(self.FPS)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
-            self.bird.move()
+
+            self.BG.move()
+            self.base.move()
+
+            rem = []
+            add_pipe = False
+            for pipe in self.pipes:
+                if pipe.collide(self.bird):
+                    pass
+                if pipe.x<-pipe.PIPE_TOP.get_width():
+                    rem.append(pipe)
+                if not pipe.passed and pipe.x<self.bird.x:
+                    pipe.passed = True
+                    add_pipe = True
+                pipe.move()
+
+            if add_pipe:
+                self.score += 1
+                self.pipes.append(Pipe(self.WIN_WIDTH+random.randrange(200)))
+
+            for r in rem:
+                self.pipes.remove(r)
+
+            if self.bird.y + self.bird.img.get_height() >= self.base.y:
+                pass
+
+            # self.bird.move()
             self.draw_window()
 
 def main():
