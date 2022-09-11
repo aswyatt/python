@@ -182,6 +182,29 @@ class FlappyBird:
         self.bird.draw(self.win)
         pygame.display.update()
 
+    def iterate(self) -> bool:
+        self.BG.move()
+        self.base.move()
+        self.bird.move()
+
+        rem = []
+        add_pipe = False
+        for pipe in self.pipes:
+            failed = pipe.CheckCollision(self.bird)
+            if pipe.CheckRemove():
+                rem.append(pipe)
+            add_pipe = pipe.CheckPassed(self.bird)
+            pipe.move()
+
+        if add_pipe:
+            self.score += 1
+            self.pipes.append(Pipe(self.WIN_WIDTH+random.randrange(200)))
+
+        for r in rem:
+            self.pipes.remove(r)
+        self.draw_window()
+        return (failed or self.base.CheckCollision(self.bird))
+
     def run(self) -> None:
         run = True
         failed = False
@@ -199,38 +222,16 @@ class FlappyBird:
                         run = False
                     if event.key == pygame.K_SPACE:
                         self.bird.jump()
-
             if failed:
                 continue
-
-            self.BG.move()
-            self.base.move()
-            self.bird.move()
-
-            rem = []
-            add_pipe = False
-            for pipe in self.pipes:
-                failed = pipe.CheckCollision(self.bird)
-                if pipe.CheckRemove():
-                    rem.append(pipe)
-                add_pipe = pipe.CheckPassed(self.bird)
-                pipe.move()
-
-            if add_pipe:
-                self.score += 1
-                self.pipes.append(Pipe(self.WIN_WIDTH+random.randrange(200)))
-
-            for r in rem:
-                self.pipes.remove(r)
-
-            self.draw_window()
-            failed = failed or self.base.CheckCollision(self.bird)
+            failed = self.iterate()
             if failed:
                 text = self.FONT.render("FAIL", 1, (150, 0, 0))
                 x = (self.WIN_WIDTH-text.get_width())//2
                 y = (self.WIN_HEIGHT-text.get_height())//2
                 self.win.blit(text, (x, y))
                 pygame.display.update()
+
 
 def main():
     flappy = FlappyBird(True)
