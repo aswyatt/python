@@ -20,13 +20,15 @@ class Bird:
     MAX_ROTATION = 25
     MIN_ROTATION = -90
     DIVE_ROTATION = -80
-    ROT_VEL = 10
+    ROT_VEL = 15
     ANIMATION_TIME = 5
-    JUMP_VEL = -10.5
+    JUMP_VEL = -4
+    VMAX = 3
+    ACCEL = .6
     IMG_ORDER = [0, 1, 2, 1]
     GLIDE_INDX = 1
-    MIN_DISP = -5
-    MAX_DISP = 16
+    # MIN_DISP = -2
+    # MAX_DISP = 16
 
     def __init__(self, x:int, y:int) -> None:
         self.x = x
@@ -36,25 +38,29 @@ class Bird:
         self.vel = 0
         self.height = self.y
         self.img_count = 0
+        self.num_jumps = 0
         self.img = self.IMGS[0]
 
     def jump(self) -> None:
         self.vel = self.JUMP_VEL
         self.tick_count = 0
         self.height = self.y
+        self.num_jumps += 1
 
     def move(self) -> None:
         self.tick_count += 1
-        dy = Clamp(
-            self.tick_count*(self.vel + 1.5*self.tick_count),
-            self.MIN_DISP,
-            self.MAX_DISP
-        )
-        self.y += dy
+        self.y += self.tick_count*self.vel
+        self.vel += (self.vel < self.VMAX) * self.ACCEL
+        # dy = Clamp(
+        #     self.tick_count*(self.vel + 0.5*self.ACCEL*self.tick_count),
+        #     self.MIN_DISP,
+        #     self.MAX_DISP
+        # )
+        # self.y += dy
 
         #   Could be achieved using logic multiplication only
         #   If moving up or above initial height, point up, otherwise tilt down if not pointing down
-        if dy<0 or self.y<self.height+50:
+        if self.vel<0:
             self.tilt = self.MAX_ROTATION
         elif self.tilt>self.MIN_ROTATION:
             self.tilt -= self.ROT_VEL
@@ -226,6 +232,7 @@ class FlappyBird:
             for r in rem:
                 self.pipes.remove(r)
 
+            self.draw_window()
             failed = failed or self.base.CheckCollision(self.bird)
             if failed:
                 text = self.FONT.render("FAIL", 1, (150, 0, 0))
@@ -233,8 +240,6 @@ class FlappyBird:
                 y = (self.WIN_HEIGHT-text.get_height())//2
                 self.win.blit(text, (x, y))
                 pygame.display.update()
-            else:
-                self.draw_window()
 
 def main():
     flappy = FlappyBird(True)
