@@ -19,16 +19,14 @@ class Bird:
     IMGS = IMGS["Bird"]
     MAX_ROTATION = 25
     MIN_ROTATION = -90
-    DIVE_ROTATION = -80
+    DIVE_ROTATION = -60
     ROT_VEL = 15
-    ANIMATION_TIME = 5
+    ANIMATION_TIME = 4
     JUMP_VEL = -4
     VMAX = 3
     ACCEL = .6
     IMG_ORDER = [0, 1, 2, 1]
     GLIDE_INDX = 1
-    # MIN_DISP = -2
-    # MAX_DISP = 16
 
     def __init__(self, x:int, y:int) -> None:
         self.x = x
@@ -51,15 +49,8 @@ class Bird:
         self.tick_count += 1
         self.y += self.tick_count*self.vel
         self.vel += (self.vel < self.VMAX) * self.ACCEL
-        # dy = Clamp(
-        #     self.tick_count*(self.vel + 0.5*self.ACCEL*self.tick_count),
-        #     self.MIN_DISP,
-        #     self.MAX_DISP
-        # )
-        # self.y += dy
 
-        #   Could be achieved using logic multiplication only
-        #   If moving up or above initial height, point up, otherwise tilt down if not pointing down
+        #   If moving up, point up, otherwise tilt down if not fully pointing down
         if self.vel<0:
             self.tilt = self.MAX_ROTATION
         elif self.tilt>self.MIN_ROTATION:
