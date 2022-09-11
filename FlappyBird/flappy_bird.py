@@ -157,15 +157,15 @@ class FlappyBird:
     WIN_WIDTH = IMGS["BG"].get_width()
     WIN_HEIGHT = 800
 
-    def __init__(self, KeyboardInput:bool = False, FPS:int = 30) -> None:
+    def __init__(self, NumBirds=1, KeyboardInput:bool = False, FPS:int = 30) -> None:
         self.win = pygame.display.set_mode((self.WIN_WIDTH, self.WIN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.KeyboardInput = KeyboardInput
         self.FPS = FPS
-        self.reset()
+        self.reset(NumBirds)
 
-    def reset(self) -> None:
-        self.bird = Bird(230,350)
+    def reset(self, NumBirds=1) -> None:
+        self.bird = [Bird(230,350)]*NumBirds
         self.pipes = [Pipe(self.WIN_WIDTH+20)]
         self.base = Base(self.WIN_HEIGHT-70)
         self.BG = Background()
