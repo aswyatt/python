@@ -1,6 +1,6 @@
 """Flappy bird game based on https://youtu.be/MMxFDaIOHsE.
 
-TODO: expand module description
+TODO: Module description
 """
 from typing import List
 from utils import *
@@ -12,7 +12,7 @@ import random
 
 pygame.font.init()
 
-# Load images (sprites / background etc.)
+# Load images for use as background & sprites.
 IMGS = {
     "Bird": [LoadImage(f"bird{n+1}.png") for n in range(3)],
     "Pipe": LoadImage("pipe.png"),
@@ -22,56 +22,55 @@ IMGS = {
 
 
 class Bird:
-    """Class to handle drawing and movement of bird.
+    """Handles movement (physics engine) and drawing of bird.
 
-    TODO: expand class description
-
+    TODO: Class description
 
     Attributes
     ----------
-    IMGS
+    IMGS: LIST[pygame.surface.Surface]
         List of pygame surfaces for each bird sprite
-    MAX_ROTATION
+    MAX_ROTATION : int
         Maximum rotation angle of bird
-    MIN_ROTATION
+    MIN_ROTATION : int
         Minimum rotation angle of bird
-    DIVE_ROTATION
+    DIVE_ROTATION : int
         When rotation angle of bird < this value, bird is considered to be diving (and will face towards the ground)
-    ROT_VEL
+    ROT_VEL : int
         Rate of rotation of bird each frame
-    ANIMATION_TIME
+    ANIMATION_TIME : int
         TODO: check how this is used
-    JUMP_VEL
+    JUMP_VEL : int
         TODO: check how this is used
-    VMAX
+    VMAX : int
         TODO: check how this is used
-    ACCEL
+    ACCEL : int
         TODO: check how this is used
-    IMG_ORDER
+    IMG_ORDER : List[int]
         List of image indexes to use when animating bird flapping. Each frame will progress to next image index (cycling back to initial index)
-    GLIDE_INDX
+    GLIDE_INDX : int
         Index of image to use when bird is diving
 
-    x, y
+    x, y : int
         Current co-ordinates of bird.
         x>0 --> Right
         y>0 --> Up
-    tilt
+    tilt : int
         Direction bird is facing.
         Increasing tilt rotates bird to face towards the sky (away from ground).
         Decreasing tilt rotates bird to face towards the ground.
-    tick_count
+    tick_count : int
         Number of time steps since last jump.
-    vel
+    vel : float
         Current vertical velocity of bird.
-    height
+    height : int
         TODO: check usage. Current vertical height of bird.
-    num_jumps
+    num_jumps : int
         Total number of "jump" key presses since start of current game.
-    img_count
+    img_count : int
         Current image index used for sprite.
         Cycling through images creates flapping motion (or gliding).
-    img
+    img : pygame.surface.Surface
         Image currently displayed as the bird sprite.
 
     Methods
@@ -80,23 +79,23 @@ class Bird:
         Updates bird parameters when "jump" button pressed.
     move
         Implements physics engine for bird motion.
-    draw(win)
+    draw(win: pygame.Surface)
         Updates bird sprite.
     get_mask
-        TODO: ???
+        TODO: summary
     """
 
-    IMGS: List[pygame.surface.Surface] = IMGS["Bird"]
-    MAX_ROTATION: int = 25
-    MIN_ROTATION: int = -90
-    DIVE_ROTATION: int = -60
-    ROT_VEL: int = 15
-    ANIMATION_TIME: int = 4
-    JUMP_VEL: int = -4
-    VMAX: int = 3
-    ACCEL: float = 0.6
-    IMG_ORDER: List[int] = [0, 1, 2, 1]
-    GLIDE_INDX: int = 1
+    IMGS = IMGS["Bird"]
+    MAX_ROTATION = 25
+    MIN_ROTATION = -90
+    DIVE_ROTATION = -60
+    ROT_VEL = 10
+    ANIMATION_TIME = 4
+    JUMP_VEL = -15
+    VMAX = 20
+    ACCEL = 2.5
+    IMG_ORDER = [0, 1, 2, 1]
+    GLIDE_INDX = 1
 
     def __init__(self, x: int, y: int) -> None:
         """
@@ -108,21 +107,22 @@ class Bird:
             Initial co-ordinates of bird
         """
 
-        self.x: int = x
-        self.y: int = y
-        self.tilt: int = 0
-        self.tick_count: int = 0
-        self.vel: int = 0
-        self.height: int = self.y
-        self.num_jumps: int = 0
-        self.img_count: int = 0
-        self.img: pygame.surface.Surface = self.IMGS[0]
+        self.x = x
+        self.y = y
+        self.tilt = 0
+        self.tick_count = 0
+        self.vel = 0
+        self.height = self.y
+        self.num_jumps = 0
+        self.img_count = 0
+        self.img = self.IMGS[0]
 
     def jump(self) -> None:
         """Updates bird parameters when "jump" button pressed.
 
         Resets the tick counter, velocity and height of bird; zeroes tick counter and increments jump counter.
         """
+
         self.vel = self.JUMP_VEL
         self.tick_count = 0
         self.height = self.y
@@ -136,7 +136,7 @@ class Bird:
         """
 
         self.tick_count += 1
-        self.y += self.tick_count * self.vel
+        self.y += self.vel
         self.vel += (self.vel < self.VMAX) * self.ACCEL
 
         #   If moving up, point up, otherwise rotate down if not fully pointing down
@@ -148,7 +148,7 @@ class Bird:
     def draw(self, win: pygame.Surface) -> None:
         """Updates bird sprite.
 
-        TODO:
+        TODO: description
         """
 
         #   If "diving", use glide-image otherwise cycle through images
@@ -166,6 +166,7 @@ class Bird:
         win.blit(rotated_img, new_rect.topleft)
 
     def get_mask(self) -> pygame.mask.Mask:
+        """TODO: summary"""
         return pygame.mask.from_surface(self.img)
 
 
@@ -248,19 +249,55 @@ class Background(ScrollingItem):
 
 
 class FlappyBird:
-    FONT = pygame.font.SysFont("comicsans", 50)
-    WIN_WIDTH = IMGS["BG"].get_width()
-    WIN_HEIGHT = 800
+    """Main class for Flappy Bird Game
 
-    def __init__(self, NumBirds=1, KeyboardInput: bool = False, FPS: int = 30) -> None:
+    TODO: description
+
+    Attributes
+    ----------
+    FONT
+        Font used for game text
+    WIN_WIDTH, WIN_HEIGHT
+        Size of window in pixels
+
+    win
+        Handle to window where game is displayed
+    clock
+        Game clock
+    KeyboardInput : default = False
+        Determines whether or not to accept keyboard input.
+    FPS
+        Approximate frame per second to run game at.
+    """
+
+    FONT = pygame.font.SysFont("comicsans", 50)
+    WIN_WIDTH: int = IMGS["BG"].get_width()
+    WIN_HEIGHT: int = 800
+
+    def __init__(
+        self, NumBirds: int = 1, KeyboardInput: bool = False, FPS: int = 30
+    ) -> None:
+        """
+        Parameters
+        ----------
+        NumBirds : int, default = 1
+            Specifies how many birds to keep track off.
+            Use NumBirds=1 for manual game
+        KeyboardInput : bool, default = False
+            Determines whether or not to accept keyboard input.
+            Set to False when training / running AI
+        FPS : int, default = 30
+            Approximate frame per second to run game at.
+        """
         self.win = pygame.display.set_mode((self.WIN_WIDTH, self.WIN_HEIGHT))
-        self.clock = pygame.time.Clock()
-        self.KeyboardInput = KeyboardInput
-        self.FPS = FPS
+        self.clock: pygame.time.Clock = pygame.time.Clock()
+        self.KeyboardInput: bool = KeyboardInput
+        self.FPS: int = FPS
         self.reset(NumBirds)
 
     def reset(self, NumBirds=1) -> None:
-        self.bird = [Bird(230, 350)] * NumBirds
+        # self.bird = [Bird(230, 350)] * NumBirds
+        self.bird = Bird(230, 350)
         self.pipes = [Pipe(self.WIN_WIDTH + 20)]
         self.base = Base(self.WIN_HEIGHT - 70)
         self.BG = Background()
@@ -328,8 +365,8 @@ class FlappyBird:
                 pygame.display.update()
 
 
-def main():
-    flappy = FlappyBird(True)
+def main() -> None:
+    flappy = FlappyBird(1, True)
     flappy.run()
     pygame.quit()
     quit()
