@@ -1,0 +1,14 @@
+matplotlib
+numpy
+pandas
+scipy
+black
+rope
+jupyter
+notebook
+ipykernel
+ipython
+nbconvert
+scikit-learn
+seaborn
+h5py
