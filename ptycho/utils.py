@@ -140,7 +140,7 @@ def freq2space2(E: NDArray, axes: int | None = None) -> NDArray:
 def space2freq2(E: NDArray, axes: int | None = None) -> NDArray:
     if axes is None:
         axes = (E.ndim - 2, E.ndim - 1)
-    return fft.fftshift(fft.fft(fft.ifftshift(E, axes=axes), axes=axes), axes=axes)  # type: ignore
+    return fft.fftshift(fft.fft2(fft.ifftshift(E, axes=axes), axes=axes), axes=axes)  # type: ignore
 
 
 def weighted_linear(
