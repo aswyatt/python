@@ -9,13 +9,14 @@ e: Final[float] = constants.e
 c: Final[float] = constants.c
 hbar: Final[float] = constants.hbar
 
+sqrt: Final[Callable] = np.sqrt
+exp: Final[Callable] = np.exp
+ln: Final[Callable] = np.log
+
 PI: Final[float] = np.pi
 TAU: Final[float] = 2 * PI
 ROOT2: Final[float] = sqrt(2).item()
 INF: Final[float] = np.inf
-sqrt: Final[Callable] = np.sqrt
-exp: Final[Callable] = np.exp
-ln: Final[Callable] = np.log
 
 LIM = np.array([-1, 1])
 
